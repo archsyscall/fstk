@@ -1,6 +1,6 @@
 # fstk
 
-> A modern file stack manager - the perfect place for your temporary files and directories
+> A modern file stack manager - the perfect place for your files and directories
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -210,4 +210,3 @@ Contributions are welcome! Feel free to submit issues or pull requests.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.# fstk
-# fstk
