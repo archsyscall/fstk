@@ -74,7 +74,7 @@ pub fn generate_hash(path: &Path, is_dir: bool) -> Result<String> {
     let path_str = path.to_string_lossy();
 
     hasher.update(path_str.as_bytes());
-    hasher.update(&timestamp.to_be_bytes());
+    hasher.update(timestamp.to_be_bytes());
     hasher.update(if is_dir { b"dir" } else { b"fil" });
 
     let hash = hasher.finalize();

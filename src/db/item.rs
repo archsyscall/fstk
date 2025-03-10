@@ -98,7 +98,7 @@ impl ItemManager {
         let mut rows = stmt.query(params![id])?;
 
         if let Some(row) = rows.next()? {
-            let mut item = StackItem::from_row(&row)?;
+            let mut item = StackItem::from_row(row)?;
             item.tags = TagManager::get_for_item(conn, id)?;
             Ok(Some(item))
         } else {
@@ -115,7 +115,7 @@ impl ItemManager {
         let mut rows = stmt.query([])?;
 
         if let Some(row) = rows.next()? {
-            let mut item = StackItem::from_row(&row)?;
+            let mut item = StackItem::from_row(row)?;
             item.tags = TagManager::get_for_item(conn, item.id)?;
             Ok(Some(item))
         } else {
@@ -161,7 +161,7 @@ impl ItemManager {
         let mut rows = stmt.query(rusqlite::params_from_iter(params))?;
 
         if let Some(row) = rows.next()? {
-            let mut item = StackItem::from_row(&row)?;
+            let mut item = StackItem::from_row(row)?;
             item.tags = TagManager::get_for_item(conn, item.id)?;
             Ok(Some(item))
         } else {
@@ -216,7 +216,7 @@ impl ItemManager {
         let mut rows = rows;
 
         while let Some(row) = rows.next()? {
-            let mut item = StackItem::from_row(&row)?;
+            let mut item = StackItem::from_row(row)?;
             item.tags = TagManager::get_for_item(conn, item.id)?;
             items.push(item);
         }
