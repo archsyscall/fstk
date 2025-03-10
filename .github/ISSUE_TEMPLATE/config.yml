@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Discuss Features & Improvements
+    url: https://github.com/yourusername/fstk/discussions/categories/ideas
+    about: For ideas and feature proposals that are not yet ready to be filed as specific issues
+  - name: Usage Questions & Help
+    url: https://github.com/yourusername/fstk/discussions/categories/q-a
+    about: Please ask usage questions, configuration help, and general support questions here

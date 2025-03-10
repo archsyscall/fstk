@@ -1,0 +1,33 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo lock (uncomment this if you're developing a library)
+# Cargo.lock
+
+# IDE/Editor specific files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*~
+.DS_Store
+
+# Test artifacts
+*.profraw
+
+# Environment variables
+.env
+.env.local
+
+# fstk specific files
+# Default data directory
+~/.fstk/
+
+# Debug logs
+*.log
+
+# User-specific temporary files
+*.tmp
