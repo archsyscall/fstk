@@ -197,16 +197,6 @@ fstk tag list
 - **Data files:** `~/.fstk/.data/` - Where your stored files and directories are kept
 - **Database:** `~/.fstk/fstk.db` (SQLite) - Tracks metadata, tags, and original locations
 
-## Contributing
-
-Contributions are welcome! Feel free to submit issues or pull requests.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.# fstk
