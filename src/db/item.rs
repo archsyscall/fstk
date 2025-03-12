@@ -24,11 +24,13 @@ impl StackItem {
         let item_type = row.get(4)?;
 
         let pushed_at_str: String = row.get(5)?;
-        // The date in SQLite is stored without timezone info, so we should parse it as Local
-        let pushed_at = chrono::NaiveDateTime::parse_from_str(&pushed_at_str, "%Y-%m-%d %H:%M:%S")
-            .map_err(|e| anyhow!("Error parsing date: {}", e))?
-            .and_local_timezone(Local)
-            .unwrap();
+        // The date in SQLite is stored as UTC without timezone info, so we need to parse it as UTC
+        // and then convert to local time
+        let naive_dt = chrono::NaiveDateTime::parse_from_str(&pushed_at_str, "%Y-%m-%d %H:%M:%S")
+            .map_err(|e| anyhow!("Error parsing date: {}", e))?;
+        // First interpret as UTC, then convert to local time
+        let pushed_at = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(naive_dt, chrono::Utc)
+            .with_timezone(&Local);
 
         Ok(StackItem {
             id,
