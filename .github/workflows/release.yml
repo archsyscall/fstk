@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Get version from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: fstk ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+  build-release:
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: fstk
+            asset_name: fstk-${{ needs.create-release.outputs.version }}-x86_64-linux
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: fstk
+            asset_name: fstk-${{ needs.create-release.outputs.version }}-aarch64-linux
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: fstk
+            asset_name: fstk-${{ needs.create-release.outputs.version }}-x86_64-macos
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: fstk
+            asset_name: fstk-${{ needs.create-release.outputs.version }}-aarch64-macos
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Install cross-compilation tools
+        if: contains(matrix.target, 'aarch64-unknown-linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Build target
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: ${{ contains(matrix.target, 'linux') && contains(matrix.target, 'aarch64') }}
+          command: build
+          args: --release --target ${{ matrix.target }}
+
+      - name: Prepare asset
+        run: |
+          cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
+          chmod +x ${{ matrix.asset_name }}
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./${{ matrix.asset_name }}
+          asset_name: ${{ matrix.asset_name }}
+          asset_content_type: application/octet-stream
+
+  update-homebrew:
+    needs: [create-release, build-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Homebrew tap
+        uses: actions/checkout@v3
+        with:
+          repository: archsyscall/homebrew-fstk
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Calculate SHA256 for macOS arm64
+        id: sha_macos_arm64
+        run: |
+          curl -sL https://github.com/${{ github.repository }}/releases/download/v${{ needs.create-release.outputs.version }}/fstk-${{ needs.create-release.outputs.version }}-aarch64-macos > fstk-aarch64-macos
+          echo "sha=$(shasum -a 256 fstk-aarch64-macos | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+
+      - name: Calculate SHA256 for macOS x86_64
+        id: sha_macos_x86_64
+        run: |
+          curl -sL https://github.com/${{ github.repository }}/releases/download/v${{ needs.create-release.outputs.version }}/fstk-${{ needs.create-release.outputs.version }}-x86_64-macos > fstk-x86_64-macos
+          echo "sha=$(shasum -a 256 fstk-x86_64-macos | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+
+      - name: Update Formula
+        run: |
+          cat > Formula/fstk.rb << EOF
+          class Fstk < Formula
+            desc "File Stack - A CLI tool for managing files and directories in a stack format"
+            homepage "https://github.com/${{ github.repository }}"
+            version "${{ needs.create-release.outputs.version }}"
+            license "MIT"
+          
+            on_macos do
+              on_arm do
+                url "https://github.com/${{ github.repository }}/releases/download/v${{ needs.create-release.outputs.version }}/fstk-${{ needs.create-release.outputs.version }}-aarch64-macos"
+                sha256 "${{ steps.sha_macos_arm64.outputs.sha }}"
+              end
+            
+              on_intel do
+                url "https://github.com/${{ github.repository }}/releases/download/v${{ needs.create-release.outputs.version }}/fstk-${{ needs.create-release.outputs.version }}-x86_64-macos"
+                sha256 "${{ steps.sha_macos_x86_64.outputs.sha }}"
+              end
+            end
+          
+            def install
+              bin.install Dir["fstk*"].first => "fstk"
+              
+              # Generate shell completions
+              output = Utils.safe_popen_read(bin/"fstk", "completion", "bash")
+              (bash_completion/"fstk").write output
+              
+              output = Utils.safe_popen_read(bin/"fstk", "completion", "zsh") 
+              (zsh_completion/"_fstk").write output
+              
+              output = Utils.safe_popen_read(bin/"fstk", "completion", "fish")
+              (fish_completion/"fstk.fish").write output
+            end
+          
+            test do
+              system "#{bin}/fstk", "--version"
+            end
+          end
+          EOF
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add Formula/fstk.rb
+          git commit -m "Update formula for fstk v${{ needs.create-release.outputs.version }}"
+          git push
