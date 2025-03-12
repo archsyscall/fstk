@@ -1,62 +1,57 @@
 use anyhow::{anyhow, Result};
-use std::env;
+use std::path::PathBuf;
 
 use crate::db::{establish_connection, get_stored_path, ItemManager};
-use crate::fs::{check_destination_conflict, copy_dir_recursive};
+use crate::fs;
 
-/// Restore an item from the stack without removing it.
+/// Restore an item from the stack to its original location and remove it from the stack.
 pub fn restore(number: Option<usize>, tags: Option<Vec<String>>) -> Result<()> {
+    let tag_vec = tags.unwrap_or_default();
+    let filter_by_tags = !tag_vec.is_empty();
+
     // Connect to database
-    let conn = establish_connection()?;
+    let mut conn = establish_connection()?;
 
     // Get item based on provided criteria
-    let item = match (number, tags.as_ref()) {
-        (Some(num), Some(tag_vec)) if !tag_vec.is_empty() => {
-            // Get item by number within filtered tags
-            let id =
-                ItemManager::get_id_by_display_number(&conn, num, tag_vec)?.ok_or_else(|| {
+    let item = match number {
+        Some(num) => {
+            // Get item by number with optional tag filtering
+            let id = if filter_by_tags {
+                ItemManager::get_id_by_display_number(&conn, num, &tag_vec)?.ok_or_else(|| {
                     anyhow!(
                         "No item found with number={} and tags=[{}]",
                         num,
                         tag_vec.join(", ")
                     )
-                })?;
+                })?
+            } else {
+                let empty_tags = Vec::new();
+                ItemManager::get_id_by_display_number(&conn, num, &empty_tags)?
+                    .ok_or_else(|| anyhow!("No item found with number={}", num))?
+            };
 
             // Get item by DB ID
             ItemManager::get_by_id(&conn, id)?
                 .ok_or_else(|| anyhow!("No item found with number={}", num))?
         }
-        (Some(num), _) => {
-            // Get item by number from full list (no tag filtering)
-            let empty_tags = Vec::new();
-            let id = ItemManager::get_id_by_display_number(&conn, num, &empty_tags)?
-                .ok_or_else(|| anyhow!("No item found with number={}", num))?;
-
-            // Get item by DB ID
-            ItemManager::get_by_id(&conn, id)?
-                .ok_or_else(|| anyhow!("No item found with number={}", num))?
-        }
-        (None, Some(tags)) => {
-            // Get latest item by tags
-            ItemManager::get_latest_by_tags(&conn, tags)?
-                .ok_or_else(|| anyhow!("No items found with tags=[{}]", tags.join(", ")))?
-        }
-        (None, None) => {
+        None => {
             // Get latest item
-            ItemManager::get_latest(&conn)?.ok_or_else(|| anyhow!("No items in the stack"))?
+            if filter_by_tags {
+                ItemManager::get_latest_by_tags(&conn, &tag_vec)?
+                    .ok_or_else(|| anyhow!("No items found with tags=[{}]", tag_vec.join(", ")))?
+            } else {
+                ItemManager::get_latest(&conn)?.ok_or_else(|| anyhow!("No items in the stack"))?
+            }
         }
     };
 
-    // Get current directory
-    let current_dir = env::current_dir()?;
-
-    // Construct destination path in current directory
-    let dest_path = current_dir.join(&item.original_name);
+    // Construct destination path using the original path
+    let dest_path = PathBuf::from(&item.original_path);
 
     // Check if destination already exists
-    if check_destination_conflict(&dest_path) {
+    if fs::check_destination_conflict(&dest_path) {
         return Err(anyhow!(
-            "Destination already exists: {}. Choose a different destination to avoid conflicts.",
+            "Original destination already exists: {}. Use 'pop' with a custom destination to avoid conflicts.",
             dest_path.display()
         ));
     }
@@ -72,14 +67,18 @@ pub fn restore(number: Option<usize>, tags: Option<Vec<String>>) -> Result<()> {
         ));
     }
 
-    // Copy the item to the current directory (do not remove from stack)
-    if item.item_type == "directory" {
-        copy_dir_recursive(&source_path, &dest_path)?;
-    } else {
-        std::fs::copy(&source_path, &dest_path)?;
+    // Ensure parent directory exists
+    if let Some(parent) = dest_path.parent() {
+        if !parent.exists() {
+            std::fs::create_dir_all(parent)?;
+        }
     }
 
-    // Skip success messages for better CLI silence
+    // Move the item to its original location
+    fs::move_or_copy(&source_path, &dest_path)?;
+
+    // Remove from database
+    ItemManager::delete(&mut conn, item.id)?;
 
     Ok(())
 }
