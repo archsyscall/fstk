@@ -50,6 +50,10 @@ pub enum Commands {
         /// Pop the most recent item with the specified tags (comma-separated)
         #[arg(long, short = 't', value_delimiter = ',')]
         tags: Option<Vec<String>>,
+
+        /// Custom output directory path (defaults to current directory)
+        #[arg(long = "output", short = 'o')]
+        output: Option<String>,
     },
 
     /// List all items in the stack

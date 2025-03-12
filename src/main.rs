@@ -20,8 +20,12 @@ fn main() -> Result<()> {
             cli::push::push(&path, tags)?;
         }
 
-        Commands::Pop { numbers, tags } => {
-            cli::pop::pop(numbers, tags)?;
+        Commands::Pop {
+            numbers,
+            tags,
+            output,
+        } => {
+            cli::pop::pop(numbers, tags, output)?;
         }
 
         Commands::List { tags } => {

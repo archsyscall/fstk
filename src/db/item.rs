@@ -29,8 +29,9 @@ impl StackItem {
         let naive_dt = chrono::NaiveDateTime::parse_from_str(&pushed_at_str, "%Y-%m-%d %H:%M:%S")
             .map_err(|e| anyhow!("Error parsing date: {}", e))?;
         // First interpret as UTC, then convert to local time
-        let pushed_at = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(naive_dt, chrono::Utc)
-            .with_timezone(&Local);
+        let pushed_at =
+            chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(naive_dt, chrono::Utc)
+                .with_timezone(&Local);
 
         Ok(StackItem {
             id,
