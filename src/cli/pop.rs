@@ -7,24 +7,34 @@ use crate::fs;
 use crate::utils::numbers::parse_number_range;
 
 /// Pop items from the stack and restore them to the current directory or a specified output directory.
-pub fn pop(numbers: Option<String>, tags: Option<Vec<String>>, output: Option<String>) -> Result<()> {
+pub fn pop(
+    numbers: Option<String>,
+    tags: Option<Vec<String>>,
+    output: Option<String>,
+) -> Result<()> {
     let tag_vec = tags.unwrap_or_default();
     let filter_by_tags = !tag_vec.is_empty();
-    
+
     // Determine output directory (default to current directory if not specified)
     let output_dir = match &output {
         Some(path) => {
             let dir_path = std::path::PathBuf::from(path);
             // Check if the output directory exists and is a directory
             if !dir_path.exists() {
-                return Err(anyhow!("Output directory does not exist: {}", dir_path.display()));
+                return Err(anyhow!(
+                    "Output directory does not exist: {}",
+                    dir_path.display()
+                ));
             }
             if !dir_path.is_dir() {
-                return Err(anyhow!("Specified output path is not a directory: {}", dir_path.display()));
+                return Err(anyhow!(
+                    "Specified output path is not a directory: {}",
+                    dir_path.display()
+                ));
             }
             dir_path
-        },
-        None => env::current_dir()?
+        }
+        None => env::current_dir()?,
     };
 
     // Connect to database
