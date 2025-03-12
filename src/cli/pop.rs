@@ -6,10 +6,26 @@ use crate::db::{establish_connection, get_stored_path, ItemManager};
 use crate::fs;
 use crate::utils::numbers::parse_number_range;
 
-/// Pop items from the stack and restore them to the current directory.
-pub fn pop(numbers: Option<String>, tags: Option<Vec<String>>) -> Result<()> {
+/// Pop items from the stack and restore them to the current directory or a specified output directory.
+pub fn pop(numbers: Option<String>, tags: Option<Vec<String>>, output: Option<String>) -> Result<()> {
     let tag_vec = tags.unwrap_or_default();
     let filter_by_tags = !tag_vec.is_empty();
+    
+    // Determine output directory (default to current directory if not specified)
+    let output_dir = match &output {
+        Some(path) => {
+            let dir_path = std::path::PathBuf::from(path);
+            // Check if the output directory exists and is a directory
+            if !dir_path.exists() {
+                return Err(anyhow!("Output directory does not exist: {}", dir_path.display()));
+            }
+            if !dir_path.is_dir() {
+                return Err(anyhow!("Specified output path is not a directory: {}", dir_path.display()));
+            }
+            dir_path
+        },
+        None => env::current_dir()?
+    };
 
     // Connect to database
     let mut conn = establish_connection()?;
@@ -25,11 +41,8 @@ pub fn pop(numbers: Option<String>, tags: Option<Vec<String>>) -> Result<()> {
             ItemManager::get_latest(&conn)?.ok_or_else(|| anyhow!("No items in the stack"))?
         };
 
-        // Get current directory
-        let current_dir = env::current_dir()?;
-
-        // Construct destination path
-        let dest_path = current_dir.join(&item.original_name);
+        // Construct destination path using output_dir
+        let dest_path = output_dir.join(&item.original_name);
 
         // Check if destination already exists
         if fs::check_destination_conflict(&dest_path) {
@@ -123,8 +136,7 @@ pub fn pop(numbers: Option<String>, tags: Option<Vec<String>>) -> Result<()> {
         }
     }
 
-    // Get current directory
-    let current_dir = env::current_dir()?;
+    // Output directory is already determined above
 
     // Track statistics
     let mut success_count = 0;
@@ -136,8 +148,8 @@ pub fn pop(numbers: Option<String>, tags: Option<Vec<String>>) -> Result<()> {
 
     // Process all items atomically (based on the initial state)
     for (display_number, item) in items_to_process {
-        // Construct destination path in current directory
-        let dest_path = current_dir.join(&item.original_name);
+        // Construct destination path in output directory
+        let dest_path = output_dir.join(&item.original_name);
 
         // Check if destination already exists
         if fs::check_destination_conflict(&dest_path) {
