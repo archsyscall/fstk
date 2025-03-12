@@ -81,7 +81,7 @@ pub enum Commands {
         tags: Option<Vec<String>>,
     },
 
-    /// Restore an item from the stack without removing it
+    /// Restore an item from the stack to its original location and remove it
     #[command(alias = "res")]
     Restore {
         /// Number of the item to restore (as shown in the list command)
