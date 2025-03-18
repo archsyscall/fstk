@@ -45,8 +45,9 @@ pub fn restore(number: Option<usize>, tags: Option<Vec<String>>) -> Result<()> {
         }
     };
 
-    // Construct destination path using the original path
-    let dest_path = PathBuf::from(&item.original_path);
+    // Construct destination path using the original path and filename
+    let mut dest_path = PathBuf::from(&item.original_path);
+    dest_path.push(&item.original_name);
 
     // Check if destination already exists
     if fs::check_destination_conflict(&dest_path) {
